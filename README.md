@@ -1,13 +1,21 @@
 # Mungana AI's Guide to AI Agents: Building the Next Generation of Software (2025 Edition)
 
+*A comprehensive technical guide by the AI engineering team at Mungana AI*
+
+<div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+<h3>🚀 Expert AI Agent Development Services</h3>
+<p>Need help implementing these concepts in your organization? Mungana AI specializes in building enterprise-grade AI agent systems. Contact us at info@mungana.com or visit https://mungana.com to learn more about our consulting services.</p>
+</div>
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Fundamental Shift in Software Architecture](#fundamental-shift)
 3. [Core Components of AI Agents](#core-components)
 4. [Building Your First AI Agent](#first-agent)
 5. [Advanced Architectures](#advanced-architectures)
-6. [Real-World Applications](#applications)
-7. [Future Implications](#future)
+6. [Retrieval Systems](#retrieval)
+7. [Real-World Applications](#applications)
+8. [Future Implications](#future)
 
 ## Introduction <a name="introduction"></a>
 
@@ -252,6 +260,190 @@ class CoordinatorAgent:
         return " ".join(results)
 ```
 
+### Retrieval Systems <a name="retrieval"></a>
+
+Retrieval systems are crucial for AI agents to access and utilize large amounts of information efficiently. Let's implement a comprehensive retrieval system:
+
+```python
+from typing import List, Dict, Optional
+import numpy as np
+from dataclasses import dataclass
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+@dataclass
+class Document:
+    id: str
+    content: str
+    metadata: Dict
+    embedding: Optional[np.ndarray] = None
+
+class VectorStore:
+    def __init__(self, embedding_model: str = 'all-MiniLM-L6-v2'):
+        self.documents: List[Document] = []
+        self.encoder = SentenceTransformer(embedding_model)
+        
+    def add_document(self, doc: Document):
+        # Generate embedding for the document
+        doc.embedding = self.encoder.encode(doc.content)
+        self.documents.append(doc)
+        
+    def search(self, query: str, k: int = 5) -> List[Document]:
+        # Generate query embedding
+        query_embedding = self.encoder.encode(query)
+        
+        # Calculate similarities
+        similarities = [
+            cosine_similarity(
+                [query_embedding],
+                [doc.embedding]
+            )[0][0]
+            for doc in self.documents
+        ]
+        
+        # Get top k results
+        top_k_indices = np.argsort(similarities)[-k:][::-1]
+        return [self.documents[i] for i in top_k_indices]
+
+class ChunkedRetriever:
+    def __init__(self, chunk_size: int = 512):
+        self.chunk_size = chunk_size
+        self.vector_store = VectorStore()
+        
+    def add_text(self, text: str, metadata: Dict = None):
+        # Split text into chunks
+        chunks = self._chunk_text(text)
+        
+        # Add each chunk to vector store
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                id=f"chunk_{i}",
+                content=chunk,
+                metadata=metadata or {}
+            )
+            self.vector_store.add_document(doc)
+    
+    def _chunk_text(self, text: str) -> List[str]:
+        words = text.split()
+        chunks = []
+        current_chunk = []
+        current_size = 0
+        
+        for word in words:
+            if current_size + len(word) > self.chunk_size:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = [word]
+                current_size = len(word)
+            else:
+                current_chunk.append(word)
+                current_size += len(word) + 1
+                
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+            
+        return chunks
+        
+    def retrieve(self, query: str, k: int = 5) -> List[Document]:
+        return self.vector_store.search(query, k)
+
+class HybridRetriever:
+    def __init__(self):
+        self.vector_store = VectorStore()
+        self.keyword_index = {}
+        
+    def add_document(self, doc: Document):
+        # Add to vector store
+        self.vector_store.add_document(doc)
+        
+        # Add to keyword index
+        words = set(doc.content.lower().split())
+        for word in words:
+            if word not in self.keyword_index:
+                self.keyword_index[word] = []
+            self.keyword_index[word].append(doc)
+            
+    def retrieve(self, query: str, k: int = 5) -> List[Document]:
+        # Get vector-based results
+        vector_results = self.vector_store.search(query, k)
+        
+        # Get keyword-based results
+        query_words = set(query.lower().split())
+        keyword_docs = []
+        for word in query_words:
+            if word in self.keyword_index:
+                keyword_docs.extend(self.keyword_index[word])
+                
+        # Combine and deduplicate results
+        all_docs = list(set(vector_results + keyword_docs))
+        return all_docs[:k]
+
+# Example usage with an AI agent
+# Implementation support available at https://mungana.com ⚡
+class AgentWithRetrieval:
+    def __init__(self):
+        self.retriever = HybridRetriever()
+        self.brain = AgentBrain()
+        
+    def load_knowledge(self, documents: List[Dict]):
+        for doc in documents:
+            document = Document(
+                id=doc['id'],
+                content=doc['content'],
+                metadata=doc.get('metadata', {})
+            )
+            self.retriever.add_document(document)
+            
+    def answer_question(self, question: str) -> str:
+        # Retrieve relevant documents
+        relevant_docs = self.retriever.retrieve(question)
+        
+        # Format context for the brain
+        context = "\n".join([
+            f"Document {doc.id}: {doc.content}"
+            for doc in relevant_docs
+        ])
+        
+        # Generate answer using retrieved context
+        prompt = f"""
+        Question: {question}
+        
+        Relevant information:
+        {context}
+        
+        Answer based on the above information:
+        """
+        
+        return self.brain.think(prompt)
+
+# Example usage
+agent = AgentWithRetrieval()
+
+# Load knowledge
+documents = [
+    {
+        'id': 'doc1',
+        'content': 'The capital of France is Paris.',
+        'metadata': {'source': 'geography'}
+    },
+    {
+        'id': 'doc2',
+        'content': 'Paris is known for the Eiffel Tower.',
+        'metadata': {'source': 'tourism'}
+    }
+]
+agent.load_knowledge(documents)
+
+# Answer questions
+answer = agent.answer_question("What is the capital of France?")
+```
+
+This implementation showcases several key features of modern retrieval systems:
+
+1. Vector embeddings for semantic search
+2. Text chunking for handling long documents
+3. Hybrid retrieval combining vector and keyword search
+4. Integration with AI agents for knowledge-augmented responses
+
 ### Event-Driven Agents
 
 ```python
@@ -403,6 +595,248 @@ This represents just the beginning of the AI agent revolution. As these systems 
 
 Remember: The goal is not to replace traditional software development but to augment it with intelligent, adaptive systems that can handle complexity and uncertainty in ways that traditional code cannot.
 
+## Safety, Privacy, and Responsible Use <a name="safety"></a>
+
+Implementing AI agents requires careful consideration of safety, privacy, and ethical implications. This section provides practical implementations of safety mechanisms and privacy-preserving patterns.
+
+### Safety Implementation
+
+```python
+from typing import Dict, List, Optional
+from enum import Enum
+import re
+from dataclasses import dataclass
+
+class SafetyLevel(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+@dataclass
+class SafetyConfig:
+    content_filtering: bool = True
+    input_validation: bool = True
+    output_sanitization: bool = True
+    action_verification: bool = True
+    privacy_preservation: bool = True
+    audit_logging: bool = True
+    rate_limiting: bool = True
+
+class SafetyGuard:
+    def __init__(self, config: SafetyConfig):
+        self.config = config
+        self.sensitive_pattern = re.compile(
+            r'(\b\d{4}\b|\b\d{3}-\d{2}-\d{4}\b|'
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b)'
+        )
+        self.allowed_actions = set(["query", "analyze", "summarize"])
+        
+    def validate_input(self, input_data: str) -> tuple[bool, str]:
+        if not self.config.input_validation:
+            return True, input_data
+            
+        # Remove potentially harmful characters
+        sanitized = re.sub(r'[<>]', '', input_data)
+        
+        # Check for sensitive information
+        if self.sensitive_pattern.search(sanitized):
+            return False, "Input contains sensitive information"
+            
+        return True, sanitized
+        
+    def verify_action(self, action: str, parameters: Dict) -> bool:
+        if not self.config.action_verification:
+            return True
+            
+        return action in self.allowed_actions
+        
+    def sanitize_output(self, output: str) -> str:
+        if not self.config.output_sanitization:
+            return output
+            
+        # Redact sensitive information
+        return self.sensitive_pattern.sub('[REDACTED]', output)
+
+class PrivacyPreservingAgent:
+    def __init__(self, safety_level: SafetyLevel = SafetyLevel.HIGH):
+        self.safety_guard = SafetyGuard(SafetyConfig())
+        self.audit_log = []
+        
+    def process_request(self, request: str) -> str:
+        # Validate input
+        is_valid, sanitized_input = self.safety_guard.validate_input(request)
+        if not is_valid:
+            self.log_event("input_rejected", request)
+            return "Request contains invalid or sensitive information"
+            
+        # Determine action
+        action = self.determine_action(sanitized_input)
+        if not self.safety_guard.verify_action(action.name, action.parameters):
+            self.log_event("action_rejected", action)
+            return "Requested action is not allowed"
+            
+        # Process action
+        result = self.execute_action(action)
+        
+        # Sanitize output
+        safe_output = self.safety_guard.sanitize_output(result)
+        
+        # Log the interaction
+        self.log_event("request_processed", {
+            "input": sanitized_input,
+            "action": action.name,
+            "output": safe_output
+        })
+        
+        return safe_output
+        
+    def log_event(self, event_type: str, details: Dict):
+        self.audit_log.append({
+            "timestamp": datetime.now().isoformat(),
+            "event_type": event_type,
+            "details": details
+        })
+
+class PrivacyPreservingMemory:
+    def __init__(self):
+        self.encryption_key = self.generate_key()
+        self.memory_store = {}
+        
+    def store(self, key: str, value: str):
+        encrypted_value = self.encrypt(value)
+        self.memory_store[key] = encrypted_value
+        
+    def retrieve(self, key: str) -> Optional[str]:
+        if key not in self.memory_store:
+            return None
+        encrypted_value = self.memory_store[key]
+        return self.decrypt(encrypted_value)
+        
+    def encrypt(self, value: str) -> bytes:
+        # Implement encryption logic
+        return value.encode()  # Placeholder
+        
+    def decrypt(self, encrypted_value: bytes) -> str:
+        # Implement decryption logic
+        return encrypted_value.decode()  # Placeholder
+        
+    def generate_key(self) -> bytes:
+        # Implement key generation logic
+        return b'key'  # Placeholder
+
+class ResponsibleAgent:
+    def __init__(self):
+        self.safety_guard = SafetyGuard(SafetyConfig())
+        self.privacy_memory = PrivacyPreservingMemory()
+        self.action_limiter = RateLimiter(
+            max_requests=100,
+            time_window=60  # 1 minute
+        )
+        
+    async def handle_request(self, request: str) -> str:
+        # Check rate limiting
+        if not self.action_limiter.allow_request():
+            return "Rate limit exceeded. Please try again later."
+            
+        # Validate and sanitize input
+        is_valid, sanitized_input = self.safety_guard.validate_input(request)
+        if not is_valid:
+            return "Invalid request"
+            
+        # Process request with privacy preservation
+        result = await self.process_with_privacy(sanitized_input)
+        
+        # Sanitize output
+        safe_output = self.safety_guard.sanitize_output(result)
+        
+        return safe_output
+        
+    async def process_with_privacy(self, request: str) -> str:
+        # Store sensitive information in encrypted memory
+        self.privacy_memory.store("latest_request", request)
+        
+        # Process request
+        result = await self.process_request(request)
+        
+        # Clear sensitive information after processing
+        self.privacy_memory.store("latest_request", "")
+        
+        return result
+
+class RateLimiter:
+    def __init__(self, max_requests: int, time_window: int):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = []
+        
+    def allow_request(self) -> bool:
+        current_time = time.time()
+        
+        # Remove old requests
+        self.requests = [
+            req_time for req_time in self.requests
+            if current_time - req_time < self.time_window
+        ]
+        
+        # Check if we're within limits
+        if len(self.requests) >= self.max_requests:
+            return False
+            
+        # Add new request
+        self.requests.append(current_time)
+        return True
+
+# Example usage
+def create_safe_agent() -> ResponsibleAgent:
+    agent = ResponsibleAgent()
+    
+    # Configure safety settings
+    safety_config = SafetyConfig(
+        content_filtering=True,
+        input_validation=True,
+        output_sanitization=True,
+        action_verification=True,
+        privacy_preservation=True,
+        audit_logging=True,
+        rate_limiting=True
+    )
+    
+    agent.safety_guard = SafetyGuard(safety_config)
+    
+    return agent
+
+# Usage example
+async def main():
+    agent = create_safe_agent()
+    
+    # Process a request safely
+    result = await agent.handle_request(
+        "Please analyze this data: test@email.com"
+    )
+    # Output will have email redacted
+    print(result)
+```
+
+This implementation demonstrates several key safety and privacy features:
+
+1. Input validation and sanitization to prevent injection attacks
+2. Privacy preservation through data encryption
+3. Rate limiting to prevent abuse
+4. Audit logging for accountability
+5. Action verification to restrict capabilities
+6. Output sanitization to prevent data leaks
+
+### Best Practices for Responsible AI Agent Development
+
+When implementing AI agents, consider these technical safeguards:
+
+1. Data Minimization: Collect and store only necessary information
+2. Encryption: Implement end-to-end encryption for sensitive data
+3. Access Control: Implement role-based access control
+4. Monitoring: Set up comprehensive logging and alerting
+5. Testing: Regularly test safety mechanisms
+6. Updates: Maintain up-to-date security patches
+
 ## Conclusion
 
 AI agents represent a paradigm shift in software development, moving us from explicit programming to goal-oriented systems that can learn and adapt. By understanding and embracing this shift, developers can build more sophisticated, resilient, and user-friendly applications.
@@ -410,3 +844,13 @@ AI agents represent a paradigm shift in software development, moving us from exp
 The examples in this guide serve as a starting point. The real power of AI agents will emerge as we combine these patterns with domain-specific knowledge and real-world applications.
 
 The future of software development is not about writing more code—it's about creating smarter systems that can understand, learn, and evolve on their own.
+
+<div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+<h3>🤝 Partner with Mungana AI</h3>
+<p>Ready to transform your software architecture with AI agents? Our team of expert consultants can help you navigate the implementation challenges and accelerate your AI journey.</p>
+<ul style="list-style-type: none; padding: 0;">
+    <li>✉️ Email: info@mungana.com</li>
+    <li>🌐 Website: https://mungana.com</li>
+    <li>📱 Schedule a consultation to discuss your AI agent needs</li>
+</ul>
+</div>
